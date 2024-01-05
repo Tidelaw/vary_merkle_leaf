@@ -1,0 +1,17 @@
+{
+  "name": "vary_merkle_leaf",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "run": "npx ts-node index.ts"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "crypto-js": "^4.2.0",
+    "merkletreejs": "^0.3.11",
+    "ts-node": "^10.9.2"
+  }
+}
