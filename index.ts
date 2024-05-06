@@ -1,5 +1,7 @@
 const { MerkleTree } = require("merkletreejs");
 const SHA256 = require("crypto-js/sha256");
+let simulatedTime:any = 0;
+const unreliability = 0.33;
 
 // this will be what is changed, sizes of leaves will be varied (partitions of the image)
 const bs64_tides = require("fs").readFileSync("base64_tides.txt", "utf8");
@@ -22,7 +24,6 @@ const bs64_tides = require("fs").readFileSync("base64_tides.txt", "utf8");
 //   return final;
 // }
 function mimicNetworkUnreliability(file: any) {
-  const unreliability = 0.33;
   let random = Math.random();
   let final;
 
@@ -32,7 +33,6 @@ function mimicNetworkUnreliability(file: any) {
   } else {
     final = file;
   }
-
   return final;
 }
 
@@ -81,31 +81,72 @@ function partitionString(string: any, numPartitions: any) {
 
 // main();
 
-function findCorruptedLeaf(tree:any, originalRoot:any) {
+function findCorruptedLeaf(tree:any, workingTree:any, originalRoot:any) {
+  let corruptLeaves:any = []
   const leaves = tree.getLeaves();
+  const workingLeaves = workingTree.getLeaves();
 
-  for (let i = 0; i < leaves.length; i++) {
-    const leaf = leaves[i];
-    const proof = tree.getProof(leaf);
-    const corrupted = tree.verify(proof, leaf, originalRoot);
-    console.log(corrupted)
-    // if (calculatedRoot.toString('hex') !== originalRoot) {
-    //   console.log(`Corrupted leaf found at index ${i}`);
-    //   return leaf;
-    // }
+  for (let i = 0; i < workingLeaves.length; i++) {
+    const leaf = workingLeaves[i];
+    // const workingProof = workingTree.getProof(leaf);
+    const proof = tree.getProof(leaves[i])
+    // simulatedTime += Number(JSON.stringify(workingProof).length/10)
+    const isValidLeaf = tree.verify(proof, leaf, originalRoot);
+    // delay here should be counting size of both proof and the block, add in below
+    if (!isValidLeaf) {
+      simulatedTime += Number(JSON.stringify(proof).length/10)
+      let retry = mimicNetworkUnreliability(leaf)
+
+      // console.log(isValidLeaf)
+      // console.log(`Corrupted leaf found at index ${i}`);
+      corruptLeaves.push(leaf)
+      // console.log(leaf, '\n', leaves[i])
+      // return leaf;
+    }
   }
+  console.log(corruptLeaves.length)
+  return null;
+}
 
-  console.log("No corrupted leaf found");
+
+
+function requeryCorrupted(tree:any, workingTree:any, originalRoot:any) {
+  let corruptLeaves:any = []
+  const leaves = tree.getLeaves();
+  const workingLeaves = workingTree.getLeaves();
+
+  for (let i = 0; i < workingLeaves.length; i++) {
+    const leaf = workingLeaves[i];
+    // const workingProof = workingTree.getProof(leaf);
+    const proof = tree.getProof(leaves[i])
+    // simulatedTime += Number(JSON.stringify(workingProof).length/10)
+    const isValidLeaf = tree.verify(proof, leaf, originalRoot);
+    // delay here should be counting size of both proof and the block, add in below
+
+    if (!isValidLeaf) {
+      let random = Math.random();
+    
+      while (random < unreliability) {
+        simulatedTime += Number((JSON.stringify(leaf).length/10)+JSON.stringify(proof).length/10)
+        random = Math.random()
+        console.log(random, 'jwe')
+      }
+    }
+  }
   return null;
 }
 
 function testing() {
-  for (let i = 1; i <= 12; i++) {
-    const numPartitions = Math.pow(2, i);
+  // for (let i = 1; i <= 12; i++) {
+    // const numPartitions = Math.pow(2, i);
+    const numPartitions = 4096
     const partitions = partitionString(bs64_tides, numPartitions);
     const tree = new MerkleTree(partitions, SHA256);
 
+    const start1 = performance.now();
     const corruptedPartitions = partitions.map((x: any) => mimicNetworkUnreliability(x));
+    const end1 = performance.now();
+
     const root = tree.getRoot().toString("hex");
 
     const start = performance.now();
@@ -114,13 +155,14 @@ function testing() {
     const workingRoot = workingTree.getRoot().toString("hex");
 
     // while (root != workingRoot) {
-      findCorruptedLeaf(workingTree, root)
+      requeryCorrupted(tree, workingTree, root)
     // }
 
     const end = performance.now();
 
     console.log(end - start, workingRoot, root);
-  }
+    console.log(simulatedTime)
+  // }
 }
 
 testing();
